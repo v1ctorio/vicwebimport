@@ -5,25 +5,25 @@ const { MongoClient } = require('mongodb');
 const readline = require('readline');
 config();
 
-const { TELEGRAM_TOKEN, MONGO_URI, TG_CHAT_ID, API_ID,API_HASH, } = process.env;
+const { TELEGRAM_TOKEN, MONGO_URI, TG_CHAT_ID, API_ID,API_HASH, SESSION_STRING} = process.env;
 const { Api } = require("telegram/tl");
 
 let mongo = new MongoClient(MONGO_URI)
-const stringSession = new StringSession("");
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
+const sessionString = new StringSession(SESSION_STRING);
 
 async function main() {
   await mongo.connect();
-  const db = mongo.db('test');
+  const db = mongo.db('vicweb');
   const postsC = db.collection('posts');
   
   const tg = new Telegram.TelegramClient(
-    stringSession,
+    sessionString,
     parseInt(API_ID),
     API_HASH,
     {
@@ -47,15 +47,25 @@ async function main() {
   });
 
   console.log("Succesfully logged in on telegram.");
-  console.log(tg.session.save()); 
 
  
   const posts = await tg.invoke(
-    new Api.channels.GetFullChannel({
-      channel: TG_CHAT_ID,
+    new Api.messages.GetHistory({
+      peer: 'vicequisd',
+      limit: 1,
     })
   );
+  const formattedPosts = posts.messages.map((post) => {
+    return {
+      _id: "tg"+post.id,
+      message: post.message,
+      date: post.date,
+    };
+  });
+
   console.log(posts);
+  await postsC.insertMany(formattedPosts);
+  
   
 
 
